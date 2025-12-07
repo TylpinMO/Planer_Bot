@@ -129,7 +129,7 @@ def task_keyboard(task_id: int, list_id: int, is_completed: bool = False, is_pre
     return builder.as_markup()
 
 
-def tasks_list_keyboard(tasks: list, list_id: int) -> InlineKeyboardMarkup:
+def tasks_list_keyboard(tasks: list, list_id: int, has_notification: bool = False) -> InlineKeyboardMarkup:
     """Клавиатура со списком задач"""
     builder = InlineKeyboardBuilder()
     
@@ -144,6 +144,16 @@ def tasks_list_keyboard(tasks: list, list_id: int) -> InlineKeyboardMarkup:
     
     builder.row(
         InlineKeyboardButton(text="➕ Добавить задачу", callback_data=f"add_task_{list_id}")
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text=f"🔔 {'Изменить' if has_notification else 'Настроить'} уведомление",
+            callback_data=f"set_notification_{list_id}"
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(text="🗑 Удалить список", callback_data=f"delete_list_{list_id}"),
+        InlineKeyboardButton(text="🧹 Очистить список", callback_data=f"clear_list_{list_id}")
     )
     builder.row(
         InlineKeyboardButton(text="📋 Все списки", callback_data="my_lists"),

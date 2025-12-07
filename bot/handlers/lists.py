@@ -57,9 +57,30 @@ async def show_lists(callback: CallbackQuery, session: AsyncSession, user: User)
 """
         await callback.message.edit_text(
             text=text,
-            reply_markup=lists_keyboard(lists)
+            reply_markup=lists_keyboard(lists, page=0)
         )
     
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("lists_page_"))
+async def show_lists_page(callback: CallbackQuery, session: AsyncSession, user: User):
+    """Показать страницу списков"""
+    page = int(callback.data.split("_")[2])
+    lists = await TaskListCRUD.get_user_lists(session, user.id)
+    
+    text = f"""
+📋 <b>Ваши списки задач</b>
+
+Всего списков: {len(lists)}
+{'(максимум 10)' if user.is_premium else '(максимум 1)'}
+
+Выберите список:
+"""
+    await callback.message.edit_text(
+        text=text,
+        reply_markup=lists_keyboard(lists, page=page)
+    )
     await callback.answer()
 
 
@@ -171,7 +192,7 @@ async def show_list_details(callback: CallbackQuery, session: AsyncSession, user
         if len(tasks) <= 5 and tasks:
             await callback.message.edit_text(
                 text=text,
-                reply_markup=tasks_list_keyboard(tasks, list_id)
+                reply_markup=tasks_list_keyboard(tasks, list_id, task_list.notification_time is not None)
             )
         else:
             await callback.message.edit_text(
@@ -292,6 +313,55 @@ async def delete_list_confirmed(callback: CallbackQuery, session: AsyncSession, 
     await callback.answer("Список удалён")
 
 
+@router.callback_query(F.data.startswith("clear_list_"))
+async def clear_list_confirm(callback: CallbackQuery):
+    """Подтверждение очистки списка"""
+    list_id = int(callback.data.split("_")[2])
+    
+    text = """
+⚠️ <b>Подтверждение очистки</b>
+
+Вы уверены, что хотите очистить этот список?
+
+Все задачи в нём будут удалены, но сам список останется.
+"""
+    
+    await callback.message.edit_text(
+        text=text,
+        reply_markup=confirm_delete_keyboard("clear", list_id)
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("confirm_delete_clear_"))
+async def clear_list_confirmed(callback: CallbackQuery, session: AsyncSession, user: User):
+    """Очистить список после подтверждения"""
+    list_id = int(callback.data.split("_")[3])
+    
+    task_list = await TaskListCRUD.get_by_id(session, list_id)
+    
+    if not task_list or task_list.user_id != user.id:
+        await callback.answer("❌ Список не найден", show_alert=True)
+        return
+    
+    # Удаляем все задачи из списка
+    tasks = await TaskCRUD.get_list_tasks(session, list_id, include_completed=True)
+    for task in tasks:
+        await TaskCRUD.delete(session, task.id)
+    
+    text = f"""
+✅ <b>Список очищен</b>
+
+Все задачи удалены из списка "{task_list.name}".
+"""
+    
+    await callback.message.edit_text(
+        text=text,
+        reply_markup=list_details_keyboard(list_id, task_list.notification_time is not None)
+    )
+    await callback.answer("Список очищен")
+
+
 @router.callback_query(F.data.startswith("cancel_delete_"))
 async def cancel_delete(callback: CallbackQuery, session: AsyncSession, user: User):
     """Отменить удаление"""
@@ -299,8 +369,43 @@ async def cancel_delete(callback: CallbackQuery, session: AsyncSession, user: Us
     item_type = parts[2]
     item_id = int(parts[3])
     
-    if item_type == "list":
-        await show_list_details(callback, session, user)
+    if item_type == "list" or item_type == "clear":
+        # Возвращаемся к просмотру списка
+        list_id = item_id
+        task_list = await TaskListCRUD.get_by_id(session, list_id)
+        
+        if task_list and task_list.user_id == user.id:
+            tasks = await TaskCRUD.get_list_tasks(session, list_id, include_completed=False)
+            completed_tasks = await TaskCRUD.get_list_tasks(session, list_id, include_completed=True)
+            completed_count = len([t for t in completed_tasks if t.is_completed])
+            
+            notification_info = ""
+            if task_list.notification_time:
+                notification_info = f"\n🔔 Уведомления: {task_list.notification_time}"
+            
+            text = f"""
+📋 <b>{task_list.name}</b>
+
+Активных задач: {len(tasks)}
+Выполнено: {completed_count}{notification_info}
+
+{'<i>Список пуст. Добавьте первую задачу!</i>' if not tasks else '<b>Активные задачи:</b>'}
+"""
+            
+            if tasks:
+                for i, task in enumerate(tasks[:10], 1):
+                    priority_emoji = {0: "", 1: "🔸", 2: "🔴"}
+                    text += f"\n{i}. {priority_emoji.get(task.priority, '')} {task.text[:50]}"
+                    if len(task.text) > 50:
+                        text += "..."
+            
+            await callback.message.edit_text(
+                text=text,
+                reply_markup=list_details_keyboard(list_id, task_list.notification_time is not None)
+            )
+    elif item_type == "task":
+        # Для задачи возвращаемся к её просмотру (если потребуется)
+        pass
     
     await callback.answer("Отменено")
 
