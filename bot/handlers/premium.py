@@ -23,7 +23,42 @@ class SetDailySummaryStates(StatesGroup):
 @router.callback_query(F.data == "premium_info")
 async def show_premium_info(callback: CallbackQuery, user: User):
     """Показать информацию о премиуме"""
-    text = """
+    
+    if user.is_premium and user.premium_until:
+        # Для активных пользователей показываем информацию о продлении
+        days_left = (user.premium_until - datetime.utcnow()).days
+        text = f"""
+⭐ <b>Премиум подписка</b>
+
+<b>Ваш статус:</b> Активна ✅
+<b>Осталось дней:</b> {days_left}
+<b>Действует до:</b> {user.premium_until.strftime('%d.%m.%Y')}
+
+<b>Хотите продлить?</b>
+При покупке новой подписки 30 дней добавятся к текущему сроку!
+
+<b>Ваши преимущества:</b>
+
+📋 <b>10 списков задач</b>
+Разделите задачи по темам, проектам, приоритетам.
+
+🔔 <b>Кастомные уведомления</b>
+Настраивайте время уведомления для каждой задачи.
+
+📊 <b>Ежедневная сводка</b>
+Получайте обзор всех задач в удобное время.
+
+⚡ <b>Приоритетная поддержка</b>
+Быстрая помощь при возникновении вопросов.
+
+💎 <b>Цена: 250 звёзд за 30 дней</b>
+
+<i>Звёзды Telegram - внутренняя валюта Telegram.
+Купить можно в любом боте через меню платежей.</i>
+"""
+    else:
+        # Для новых пользователей
+        text = """
 ⭐ <b>Премиум подписка</b>
 
 <b>Что вы получите:</b>
@@ -35,6 +70,9 @@ async def show_premium_info(callback: CallbackQuery, user: User):
 🔔 <b>Кастомные уведомления</b>
 Настраивайте уникальное время уведомления для каждой задачи.
 Полный контроль над вашим расписанием!
+
+📊 <b>Ежедневная сводка</b>
+Получайте обзор всех ваших задач в удобное для вас время.
 
 ⚡ <b>Приоритетная поддержка</b>
 Быстрая помощь при возникновении вопросов.
@@ -99,10 +137,6 @@ async def show_premium_status(callback: CallbackQuery, user: User, session: Asyn
 @router.callback_query(F.data == "buy_premium")
 async def buy_premium(callback: CallbackQuery, user: User):
     """Инициировать покупку премиума"""
-    if user.is_premium:
-        await callback.answer("У вас уже есть активная премиум подписка!", show_alert=True)
-        return
-    
     # Получаем данные для инвойса
     invoice_data = PaymentService.get_premium_invoice_data()
     
@@ -112,7 +146,10 @@ async def buy_premium(callback: CallbackQuery, user: User):
         provider_token=""  # Пустой для Telegram Stars
     )
     
-    await callback.answer("Счёт на оплату отправлен!")
+    if user.is_premium:
+        await callback.answer("Счёт отправлен! Продление добавит 30 дней к вашей подписке.")
+    else:
+        await callback.answer("Счёт на оплату отправлен!")
 
 
 @router.pre_checkout_query()
@@ -146,8 +183,11 @@ async def process_successful_payment(message: Message, session: AsyncSession, us
         amount_stars=payment_info.total_amount
     )
     
-    # Активируем премиум
-    await UserCRUD.set_premium(session, user.id, days=30)
+    # Проверяем, было ли продление или новая подписка
+    was_premium = user.is_premium and user.premium_until and user.premium_until > datetime.utcnow()
+    
+    # Активируем премиум (добавляет 30 дней к текущей дате окончания или устанавливает новую)
+    updated_user = await UserCRUD.set_premium(session, user.id, days=30)
     
     # Создаём подписку
     await SubscriptionCRUD.create(
@@ -157,14 +197,36 @@ async def process_successful_payment(message: Message, session: AsyncSession, us
         days=30
     )
     
-    text = """
+    if was_premium:
+        # Продление существующей подписки
+        text = f"""
+🎉 <b>Премиум продлён!</b>
+
+Ваша премиум подписка успешно продлена на 30 дней.
+
+<b>Новая дата окончания:</b> {updated_user.premium_until.strftime('%d.%m.%Y')}
+
+<b>Ваши преимущества:</b>
+📋 До 10 списков задач
+🔔 Кастомные уведомления для каждой задачи
+📊 Ежедневная сводка по всем задачам
+⚡ Приоритетная поддержка
+
+Спасибо за поддержку! 💙
+"""
+    else:
+        # Новая подписка
+        text = f"""
 🎉 <b>Поздравляем! Премиум активирован!</b>
 
 Ваша премиум подписка успешно активирована на 30 дней.
 
+<b>Действует до:</b> {updated_user.premium_until.strftime('%d.%m.%Y')}
+
 <b>Теперь вам доступно:</b>
 📋 До 10 списков задач
 🔔 Кастомные уведомления для каждой задачи
+📊 Ежедневная сводка по всем задачам
 ⚡ Приоритетная поддержка
 
 Спасибо за поддержку! 💙

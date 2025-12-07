@@ -41,14 +41,22 @@ class UserCRUD:
     
     @staticmethod
     async def set_premium(session: AsyncSession, user_id: int, days: int = 30) -> User:
-        """Установить премиум статус"""
+        """Установить премиум статус или продлить существующий"""
         result = await session.execute(
             select(User).where(User.id == user_id)
         )
         user = result.scalar_one()
         
         user.is_premium = True
-        user.premium_until = datetime.utcnow() + timedelta(days=days)
+        
+        # Если у пользователя уже есть активный премиум, добавляем дни к текущей дате окончания
+        if user.premium_until and user.premium_until > datetime.utcnow():
+            user.premium_until = user.premium_until + timedelta(days=days)
+        else:
+            # Если премиума нет или он истёк, устанавливаем новую дату
+            user.premium_until = datetime.utcnow() + timedelta(days=days)
+        
+        # Сбрасываем флаги уведомлений при продлении
         user.premium_notified_3days = False
         user.premium_notified_2days = False
         user.premium_notified_1day = False
