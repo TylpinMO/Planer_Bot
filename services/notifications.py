@@ -62,15 +62,22 @@ class NotificationService:
         logger.info("Сервис уведомлений остановлен")
     
     async def check_notifications(self):
-        """Проверка и отправка уведомлений"""
+        """
+        Проверка и отправка уведомлений (оптимизированная версия).
+        Вместо 27 запросов (по одному на каждый часовой пояс), делаем 3-4 умных запроса.
+        """
         try:
-            moscow_time = datetime.now(MOSCOW_TZ)
-            
             async with async_session_maker() as session:
-                # Проходим по всем возможным часовым поясам (-12 до +14)
-                for tz_offset in range(-12, 15):
-                    tz = timezone(timedelta(hours=tz_offset))
-                    current_time = datetime.now(tz).strftime('%H:%M')
+                # Получаем все уникальные часовые пояса пользователей
+                result = await session.execute(
+                    select(User.timezone_offset).distinct()
+                )
+                active_timezones = [tz for (tz,) in result.all()]
+                
+                # Для каждого активного часового пояса проверяем уведомления
+                for tz_offset in active_timezones:
+                    from bot.utils.datetime_helpers import get_user_local_time_str
+                    current_time = get_user_local_time_str(tz_offset)
                     
                     # Уведомления для списков в этом часовом поясе
                     await self._check_list_notifications(session, current_time, tz_offset)
@@ -80,6 +87,7 @@ class NotificationService:
                     
                     # Ежедневная сводка для премиум пользователей
                     await self._check_daily_summary(session, current_time, tz_offset)
+                    
         except Exception as e:
             logger.error(f"Критическая ошибка в check_notifications: {e}", exc_info=True)
     
