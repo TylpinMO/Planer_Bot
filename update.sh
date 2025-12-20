@@ -7,7 +7,6 @@ echo "🔄 Начало обновления PlanerBot..."
 
 # Получаем обновления из GitHub
 echo "📥 Получение обновлений из GitHub..."
-git fetch origin
 git pull origin main
 
 echo ""
