@@ -5,16 +5,10 @@ set -e  # Остановка при ошибке
 
 echo "🔄 Начало обновления PlanerBot..."
 
-# Сначала получаем обновления (включая сам update.sh)
+# Получаем обновления из GitHub
 echo "📥 Получение обновлений из GitHub..."
 git fetch origin
 git pull origin main
-
-# Проверяем, не изменился ли сам update.sh
-if git diff HEAD@{1} HEAD -- update.sh | grep -q .; then
-    echo "⚡ Скрипт update.sh был обновлён. Перезапускаем..."
-    exec bash "$0" "$@"
-fi
 
 echo ""
 echo "🔧 Применение обновлений..."
