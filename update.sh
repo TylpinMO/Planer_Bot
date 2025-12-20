@@ -52,16 +52,15 @@ if [ -f "migrate_existing_db.py" ]; then
     echo "✅ Миграции применены"
 fi
 
-# Перезапускаем бота (если используется systemd)
-if systemctl is-active --quiet planerbot.service; then
-    echo "🔄 Перезапуск сервиса..."
-    sudo systemctl restart planerbot.service
-    echo "✅ Бот перезапущен"
-else
-    echo "⚠️  Systemd сервис не найден. Перезапустите бота вручную."
-fi
-
 echo ""
 echo "✅ Обновление завершено успешно!"
-echo "📊 Для проверки статуса: sudo systemctl status planerbot.service"
-echo "📋 Для просмотра логов: sudo journalctl -u planerbot.service -f"
+echo ""
+echo "📋 Для перезапуска бота:"
+echo "   1. Остановите бота: tmux attach -t planerbot, затем Ctrl+C"
+echo "   2. Запустите заново: python main.py"
+echo "   3. Отключитесь: Ctrl+B, затем D"
+echo ""
+echo "📊 Просмотр логов:"
+echo "   tail -f logs/bot.log          # В реальном времени"
+echo "   less logs/bot.log              # Скроллинг"
+echo "   grep ERROR logs/bot.log        # Только ошибки"
