@@ -38,6 +38,7 @@ wheels/
 *.swp
 *.swo
 *~
+.DS_Store
 
 # Logs
 logs/
