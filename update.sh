@@ -10,6 +10,14 @@ if [ -f "planner.db" ]; then
     echo "💾 Создание резервной копии базы данных..."
     cp planner.db planner.db.backup.$(date +%Y%m%d_%H%M%S)
     echo "✅ Резервная копия создана"
+    
+    # Удаляем старые бэкапы, оставляя последние 5
+    backup_count=$(ls -1 planner.db.backup* 2>/dev/null | wc -l)
+    if [ "$backup_count" -gt 5 ]; then
+        echo "🧹 Удаление старых бэкапов (оставляем последние 5)..."
+        ls -t planner.db.backup* | tail -n +6 | xargs rm -f
+        echo "✅ Старые бэкапы удалены"
+    fi
 fi
 
 # Сохраняем .env
