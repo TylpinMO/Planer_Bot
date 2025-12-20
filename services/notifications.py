@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from aiogram import Bot
+from aiogram.exceptions import TelegramAPIError
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
@@ -14,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 # Московский часовой пояс (UTC+3)
 MOSCOW_TZ = timezone(timedelta(hours=3))
+
+def utc_now():
+    """Получить текущее время UTC с timezone info"""
+    return datetime.now(timezone.utc)
 
 
 class NotificationService:
@@ -47,26 +52,29 @@ class NotificationService:
     
     async def check_notifications(self):
         """Проверка и отправка уведомлений"""
-        moscow_time = datetime.now(MOSCOW_TZ)
-        
-        async with async_session_maker() as session:
-            # Проверяем истечение премиума раз в день в 10:00 по МСК
-            if moscow_time.hour == 10 and moscow_time.minute == 0:
-                await self._check_premium_expiration(session)
+        try:
+            moscow_time = datetime.now(MOSCOW_TZ)
             
-            # Проходим по всем возможным часовым поясам (-12 до +14)
-            for tz_offset in range(-12, 15):
-                tz = timezone(timedelta(hours=tz_offset))
-                current_time = datetime.now(tz).strftime('%H:%M')
+            async with async_session_maker() as session:
+                # Проверяем истечение премиума раз в день в 10:00 по МСК
+                if moscow_time.hour == 10 and moscow_time.minute == 0:
+                    await self._check_premium_expiration(session)
                 
-                # Уведомления для списков в этом часовом поясе
-                await self._check_list_notifications(session, current_time, tz_offset)
-                
-                # Уведомления для задач в этом часовом поясе (только премиум)
-                await self._check_task_notifications(session, current_time, tz_offset)
-                
-                # Ежедневная сводка для премиум пользователей
-                await self._check_daily_summary(session, current_time, tz_offset)
+                # Проходим по всем возможным часовым поясам (-12 до +14)
+                for tz_offset in range(-12, 15):
+                    tz = timezone(timedelta(hours=tz_offset))
+                    current_time = datetime.now(tz).strftime('%H:%M')
+                    
+                    # Уведомления для списков в этом часовом поясе
+                    await self._check_list_notifications(session, current_time, tz_offset)
+                    
+                    # Уведомления для задач в этом часовом поясе (только премиум)
+                    await self._check_task_notifications(session, current_time, tz_offset)
+                    
+                    # Ежедневная сводка для премиум пользователей
+                    await self._check_daily_summary(session, current_time, tz_offset)
+        except Exception as e:
+            logger.error(f"Критическая ошибка в check_notifications: {e}", exc_info=True)
     
     async def _check_list_notifications(self, session, current_time: str, tz_offset: int):
         """Проверка уведомлений для списков"""
@@ -152,8 +160,10 @@ class NotificationService:
                 reply_markup=main_menu_keyboard(task_list.user.is_premium, is_admin)
             )
         
+        except TelegramAPIError as e:
+            logger.error(f"Telegram API ошибка при отправке уведомления о списке {task_list.id}: {e}")
         except Exception as e:
-            logger.error(f"Ошибка при отправке уведомления о списке {task_list.id}: {e}")
+            logger.error(f"Ошибка при отправке уведомления о списке {task_list.id}: {e}", exc_info=True)
     
     async def _send_task_notification(self, task: Task):
         """Отправить уведомление о задаче"""
@@ -185,8 +195,10 @@ class NotificationService:
                 reply_markup=main_menu_keyboard(task.task_list.user.is_premium, is_admin)
             )
         
+        except TelegramAPIError as e:
+            logger.error(f"Telegram API ошибка при отправке уведомления о задаче {task.id}: {e}")
         except Exception as e:
-            logger.error(f"Ошибка при отправке уведомления о задаче {task.id}: {e}")
+            logger.error(f"Ошибка при отправке уведомления о задаче {task.id}: {e}", exc_info=True)
     
     async def _check_daily_summary(self, session, current_time: str, tz_offset: int):
         """Проверка и отправка ежедневной сводки для премиум пользователей"""
@@ -263,7 +275,7 @@ class NotificationService:
     
     async def _check_premium_expiration(self, session):
         """Проверка истечения премиума и отправка уведомлений"""
-        now = datetime.utcnow()
+        now = utc_now()
         
         # Обрабатываем истёкший премиум
         await self._handle_expired_premium(session, now)

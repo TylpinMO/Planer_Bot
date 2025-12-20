@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from database.models import User, TaskList, Task, Subscription, Payment
+from bot.utils.datetime_helpers import utc_now
 
 
 class UserCRUD:
@@ -50,11 +51,11 @@ class UserCRUD:
         user.is_premium = True
         
         # Если у пользователя уже есть активный премиум, добавляем дни к текущей дате окончания
-        if user.premium_until and user.premium_until > datetime.utcnow():
+        if user.premium_until and user.premium_until > utc_now():
             user.premium_until = user.premium_until + timedelta(days=days)
         else:
             # Если премиума нет или он истёк, устанавливаем новую дату
-            user.premium_until = datetime.utcnow() + timedelta(days=days)
+            user.premium_until = utc_now() + timedelta(days=days)
         
         # Сбрасываем флаги уведомлений при продлении
         user.premium_notified_3days = False
@@ -264,7 +265,7 @@ class TaskCRUD:
         task = result.scalar_one()
         
         task.is_completed = not task.is_completed
-        task.completed_at = datetime.utcnow() if task.is_completed else None
+        task.completed_at = utc_now() if task.is_completed else None
         
         await session.commit()
         await session.refresh(task)
@@ -304,7 +305,7 @@ class SubscriptionCRUD:
         subscription = Subscription(
             user_id=user_id,
             payment_id=payment_id,
-            expires_at=datetime.utcnow() + timedelta(days=days)
+            expires_at=utc_now() + timedelta(days=days)
         )
         session.add(subscription)
         await session.commit()
@@ -327,7 +328,7 @@ class SubscriptionCRUD:
                 and_(
                     Subscription.user_id == user_id,
                     Subscription.is_active == True,
-                    Subscription.expires_at > datetime.utcnow()
+                    Subscription.expires_at > utc_now()
                 )
             )
             .order_by(Subscription.expires_at.desc())

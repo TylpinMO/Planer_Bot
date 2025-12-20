@@ -1,6 +1,8 @@
 """Точка входа приложения"""
 import asyncio
 import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 
@@ -10,15 +12,37 @@ from bot.handlers import register_handlers
 from services.notifications import NotificationService
 
 
-# Настройка минимального логирования
-logging.basicConfig(
-    level=logging.WARNING,  # Только WARNING и ERROR
-    format='%(asctime)s - %(levelname)s - %(message)s'
+# Создаем директорию для логов
+logs_dir = Path("logs")
+logs_dir.mkdir(exist_ok=True)
+
+# Настройка логирования с ротацией файлов
+file_handler = RotatingFileHandler(
+    logs_dir / "bot.log",
+    maxBytes=10 * 1024 * 1024,  # 10 MB
+    backupCount=5,  # Хранить 5 файлов
+    encoding='utf-8'
+)
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(
+    logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 )
 
-# Для нашего бота оставляем только критичные сообщения
+# Консольный handler для критичных ошибок
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.WARNING)
+console_handler.setFormatter(
+    logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+)
+
+# Настройка root logger
+logging.basicConfig(
+    level=logging.INFO,
+    handlers=[file_handler, console_handler]
+)
+
+# Для нашего бота
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 # Отключаем подробное логирование библиотек
 logging.getLogger('aiogram').setLevel(logging.WARNING)

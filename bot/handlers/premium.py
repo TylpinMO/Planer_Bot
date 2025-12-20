@@ -4,11 +4,11 @@ from aiogram.types import CallbackQuery, PreCheckoutQuery, Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
 
 from database.models import User
 from database.crud import UserCRUD, SubscriptionCRUD, PaymentCRUD
 from bot.keyboards.inline import premium_keyboard, main_menu_keyboard, back_to_menu_keyboard, premium_status_keyboard, cancel_keyboard, back_to_profile_keyboard
+from bot.utils.datetime_helpers import utc_now
 from services.payments import PaymentService
 from config import config
 
@@ -26,7 +26,7 @@ async def show_premium_info(callback: CallbackQuery, user: User):
     
     if user.is_premium and user.premium_until:
         # Для активных пользователей показываем информацию о продлении
-        days_left = (user.premium_until - datetime.utcnow()).days
+        days_left = (user.premium_until - utc_now()).days
         text = f"""
 ⭐ <b>Премиум подписка</b>
 
@@ -102,7 +102,7 @@ async def show_premium_status(callback: CallbackQuery, user: User, session: Asyn
     
     days_left = 0
     if user.premium_until:
-        days_left = (user.premium_until - datetime.utcnow()).days
+        days_left = (user.premium_until - utc_now()).days
     
     summary_info = ""
     if user.daily_summary_time:

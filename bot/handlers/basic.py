@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import User
 from bot.keyboards.inline import main_menu_keyboard, back_to_menu_keyboard, timezone_keyboard, profile_keyboard
+from bot.utils.datetime_helpers import utc_now
 from config import config
 
 router = Router()

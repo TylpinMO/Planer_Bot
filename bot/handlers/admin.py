@@ -3,10 +3,12 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import timedelta
 
 from database.models import User
 from database.crud import UserCRUD, PaymentCRUD, TaskListCRUD
 from bot.keyboards.inline import back_to_menu_keyboard
+from bot.utils.datetime_helpers import utc_now
 from config import config
 
 router = Router()
@@ -94,8 +96,7 @@ async def cmd_stats(message: Message, session: AsyncSession):
             username = f"@{user.username}" if user.username else user.first_name or "Без имени"
             days_left = 0
             if user.premium_until:
-                from datetime import datetime
-                days_left = (user.premium_until - datetime.utcnow()).days
+                days_left = (user.premium_until - utc_now()).days
             text += f"\n• {username} (ID: {user.telegram_id}) - осталось {days_left} дней"
         
         if len(premium_users) > 10:
@@ -292,8 +293,7 @@ async def cmd_user_info(message: Message, session: AsyncSession):
 """
     
     if user.is_premium and user.premium_until:
-        from datetime import datetime
-        days_left = (user.premium_until - datetime.utcnow()).days
+        days_left = (user.premium_until - utc_now()).days
         text += f"\n<b>Премиум:</b>\n• Активен до: {user.premium_until.strftime('%d.%m.%Y')}\n• Осталось дней: {days_left}"
     elif user.is_premium and not user.premium_until:
         text += f"\n<b>Премиум:</b>\n• ♾️ Бесконечная подписка"
@@ -335,13 +335,12 @@ async def cmd_extend_premium(message: Message, session: AsyncSession):
         return
     
     # Продляем премиум
-    from datetime import datetime, timedelta
-    if user.premium_until and user.premium_until > datetime.utcnow():
+    if user.premium_until and user.premium_until > utc_now():
         # Если премиум активен - продляем от текущей даты окончания
         new_date = user.premium_until + timedelta(days=days)
     else:
         # Если премиум неактивен - продляем от сегодня
-        new_date = datetime.utcnow() + timedelta(days=days)
+        new_date = utc_now() + timedelta(days=days)
     
     user.is_premium = True
     user.premium_until = new_date

@@ -40,4 +40,5 @@ wheels/
 *~
 
 # Logs
+logs/
 *.log
