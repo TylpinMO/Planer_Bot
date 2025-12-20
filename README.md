@@ -60,7 +60,12 @@ python main.py
 ```env
 BOT_TOKEN=your_bot_token_from_botfather
 ADMIN_IDS=123456789
+
+# SQLite (рекомендуется для начала)
 DATABASE_URL=sqlite+aiosqlite:///planner.db
+
+# PostgreSQL (при >500 пользователях)
+# DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/dbname
 ```
 
 ## 🛠 Технологии
@@ -69,7 +74,7 @@ DATABASE_URL=sqlite+aiosqlite:///planner.db
 - **aiogram 3.4.1** - Telegram Bot Framework
 - **SQLAlchemy 2.0.25** - ORM
 - **APScheduler 3.10.4** - Планировщик уведомлений
-- **SQLite** - База данных
+- **SQLite / PostgreSQL** - База данных (на выбор)
 
 ## 📖 Команды
 
