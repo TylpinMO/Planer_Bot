@@ -41,6 +41,17 @@ class NotificationService:
             timezone=MOSCOW_TZ
         )
         
+        # Проверка истечения премиума каждый час (вместо 1 раз в день)
+        # Это дополнительная защита на случай неактивных пользователей
+        self.scheduler.add_job(
+            self.check_premium_expiration_scheduled,
+            'cron',
+            hour='*',
+            minute=0,
+            id='check_premium_expiration',
+            timezone=MOSCOW_TZ
+        )
+        
         self.scheduler.start()
         logger.info("Сервис уведомлений запущен (часовой пояс: UTC+3 Москва)")
     
@@ -56,10 +67,6 @@ class NotificationService:
             moscow_time = datetime.now(MOSCOW_TZ)
             
             async with async_session_maker() as session:
-                # Проверяем истечение премиума раз в день в 10:00 по МСК
-                if moscow_time.hour == 10 and moscow_time.minute == 0:
-                    await self._check_premium_expiration(session)
-                
                 # Проходим по всем возможным часовым поясам (-12 до +14)
                 for tz_offset in range(-12, 15):
                     tz = timezone(timedelta(hours=tz_offset))
@@ -75,6 +82,18 @@ class NotificationService:
                     await self._check_daily_summary(session, current_time, tz_offset)
         except Exception as e:
             logger.error(f"Критическая ошибка в check_notifications: {e}", exc_info=True)
+    
+    async def check_premium_expiration_scheduled(self):
+        """
+        Проверка истечения премиума по расписанию (каждый час).
+        Основная проверка происходит в PremiumCheckMiddleware,
+        это дополнительная защита для неактивных пользователей.
+        """
+        try:
+            async with async_session_maker() as session:
+                await self._check_premium_expiration(session)
+        except Exception as e:
+            logger.error(f"Ошибка при проверке истечения премиума: {e}", exc_info=True)
     
     async def _check_list_notifications(self, session, current_time: str, tz_offset: int):
         """Проверка уведомлений для списков"""

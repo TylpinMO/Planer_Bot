@@ -3,6 +3,7 @@ from aiogram import Dispatcher
 
 from bot.handlers import basic, lists, tasks, premium, admin
 from bot.middlewares.user import DatabaseMiddleware, UserMiddleware
+from bot.middlewares.premium import PremiumCheckMiddleware
 
 
 def register_handlers(dp: Dispatcher):
@@ -13,6 +14,10 @@ def register_handlers(dp: Dispatcher):
     
     dp.message.middleware(UserMiddleware())
     dp.callback_query.middleware(UserMiddleware())
+    
+    # Middleware для проверки истечения премиума
+    dp.message.middleware(PremiumCheckMiddleware())
+    dp.callback_query.middleware(PremiumCheckMiddleware())
     
     # Регистрация роутеров
     dp.include_router(admin.router)  # Админ команды первыми
