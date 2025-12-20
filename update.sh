@@ -5,6 +5,21 @@ set -e  # Остановка при ошибке
 
 echo "🔄 Начало обновления PlanerBot..."
 
+# Сначала получаем обновления (включая сам update.sh)
+echo "📥 Получение обновлений из GitHub..."
+git fetch origin
+git pull origin main
+
+# Проверяем, не изменился ли сам update.sh
+if git diff HEAD@{1} HEAD -- update.sh | grep -q .; then
+    echo "⚡ Скрипт update.sh был обновлён. Перезапускаем..."
+    exec bash "$0" "$@"
+fi
+
+echo ""
+echo "🔧 Применение обновлений..."
+echo ""
+
 # Сохраняем текущую базу данных
 if [ -f "planner.db" ]; then
     echo "💾 Создание резервной копии базы данных..."
@@ -25,18 +40,6 @@ if [ -f ".env" ]; then
     echo "💾 Создание резервной копии .env..."
     cp .env .env.backup
     echo "✅ .env сохранен"
-fi
-
-# Получаем обновления из GitHub
-echo "📥 Получение обновлений из GitHub..."
-git fetch origin
-git pull origin main
-
-# Восстанавливаем .env
-if [ -f ".env.backup" ]; then
-    echo "🔧 Восстановление .env..."
-    mv .env.backup .env
-    echo "✅ .env восстановлен"
 fi
 
 # Активируем виртуальное окружение
