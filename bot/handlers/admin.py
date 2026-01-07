@@ -19,6 +19,15 @@ def is_admin(user_id: int) -> bool:
     return user_id in config.ADMIN_IDS
 
 
+@router.message(Command("test_admin"))
+async def cmd_test_admin(message: Message):
+    """Тестовая команда для проверки работы обработчиков"""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"🔍 TEST: Команда test_admin получена от {message.from_user.id}")
+    await message.answer(f"✅ Обработчик работает!\n\nВаш ID: {message.from_user.id}\nАдмин: {is_admin(message.from_user.id)}\nАдмины: {config.ADMIN_IDS}")
+
+
 @router.message(Command("admin"))
 async def cmd_admin(message: Message):
     """Админ панель"""
@@ -110,40 +119,62 @@ async def cmd_stats(message: Message, session: AsyncSession):
 @router.message(Command("give_premium"))
 async def cmd_give_premium(message: Message, session: AsyncSession):
     """Выдать премиум пользователю"""
-    if not is_admin(message.from_user.id):
-        await message.answer("❌ У вас нет доступа к этой команде.")
-        return
-    
-    # Парсим команду
-    parts = message.text.split()
-    if len(parts) < 2:
-        await message.answer("❌ Использование: /give_premium USER_ID [DAYS]\n\nПример: /give_premium 123456789 30")
-        return
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
     
     try:
-        user_telegram_id = int(parts[1])
-        days = int(parts[2]) if len(parts) > 2 else 30
-    except ValueError:
-        await message.answer("❌ Неверный формат. USER_ID и DAYS должны быть числами.")
-        return
-    
-    # Находим пользователя
-    user = await UserCRUD.get_by_telegram_id(session, user_telegram_id)
-    
-    if not user:
-        await message.answer(f"❌ Пользователь с ID {user_telegram_id} не найден.")
-        return
-    
-    # Выдаём премиум
-    await UserCRUD.set_premium(session, user.id, days)
-    
-    # Создаём подписку (без платежа)
-    from database.crud import SubscriptionCRUD
-    await SubscriptionCRUD.create(session, user.id, payment_id=None, days=days)
-    
-    username = f"@{user.username}" if user.username else user.first_name or "Без имени"
-    
-    text = f"""
+        logger.info(f"🔍 give_premium вызвана пользователем {message.from_user.id}, текст: {message.text}")
+        logger.info(f"🔍 Список админов: {config.ADMIN_IDS}")
+        logger.info(f"🔍 Проверка is_admin: {is_admin(message.from_user.id)}")
+        
+        if not is_admin(message.from_user.id):
+            logger.warning(f"❌ Пользователь {message.from_user.id} не является админом")
+            await message.answer("❌ У вас нет доступа к этой команде.")
+            return
+        
+        logger.info(f"✅ Пользователь {message.from_user.id} прошёл проверку админа")
+        
+        # Парсим команду
+        parts = message.text.split()
+        logger.info(f"🔍 Части команды: {parts}, длина: {len(parts)}")
+        if len(parts) < 2:
+            logger.info(f"❌ Недостаточно параметров в команде")
+            await message.answer("❌ Использование: /give_premium USER_ID [DAYS]\n\nПример: /give_premium 123456789 30")
+            return
+        
+        try:
+            user_telegram_id = int(parts[1])
+            days = int(parts[2]) if len(parts) > 2 else 30
+            logger.info(f"🔍 Распарсено: user_telegram_id={user_telegram_id}, days={days}")
+        except ValueError:
+            logger.error(f"❌ Ошибка парсинга: parts={parts}")
+            await message.answer("❌ Неверный формат. USER_ID и DAYS должны быть числами.")
+            return
+        
+        # Находим пользователя
+        logger.info(f"🔍 Ищем пользователя с telegram_id={user_telegram_id}")
+        user = await UserCRUD.get_by_telegram_id(session, user_telegram_id)
+        
+        if not user:
+            logger.warning(f"❌ Пользователь с ID {user_telegram_id} не найден в БД")
+            await message.answer(f"❌ Пользователь с ID {user_telegram_id} не найден.")
+            return
+        
+        logger.info(f"✅ Пользователь найден: {user.telegram_id}, начинаем выдачу премиума")
+        
+        # Выдаём премиум
+        await UserCRUD.set_premium(session, user.id, days)
+        logger.info(f"✅ Премиум установлен через UserCRUD.set_premium")
+        
+        # Создаём подписку (без платежа)
+        from database.crud import SubscriptionCRUD
+        await SubscriptionCRUD.create(session, user.id, payment_id=None, days=days)
+        logger.info(f"✅ Подписка создана через SubscriptionCRUD.create")
+        
+        username = f"@{user.username}" if user.username else user.first_name or "Без имени"
+        
+        text = f"""
 ✅ <b>Премиум выдан!</b>
 
 Пользователь: {username}
@@ -152,14 +183,17 @@ ID: {user.telegram_id}
 
 Премиум успешно активирован.
 """
-    
-    await message.answer(text)
-    
-    # Уведомляем пользователя
-    try:
-        await message.bot.send_message(
-            chat_id=user.telegram_id,
-            text=f"""
+        
+        logger.info(f"✅ Отправляем сообщение администратору")
+        await message.answer(text)
+        logger.info(f"✅ Сообщение администратору отправлено")
+        
+        # Уведомляем пользователя
+        try:
+            logger.info(f"🔍 Пытаемся отправить уведомление пользователю {user.telegram_id}")
+            await message.bot.send_message(
+                chat_id=user.telegram_id,
+                text=f"""
 🎉 <b>Вам выдан премиум!</b>
 
 Администратор активировал для вас премиум подписку на {days} дней.
@@ -171,9 +205,18 @@ ID: {user.telegram_id}
 
 Приятного использования! ✨
 """
-        )
-    except:
-        pass
+            )
+            logger.info(f"✅ Уведомление пользователю отправлено успешно")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при отправке уведомления пользователю: {e}")
+    
+    except Exception as e:
+        logger.error(f"💥 КРИТИЧЕСКАЯ ОШИБКА в give_premium: {e}")
+        logger.error(f"💥 Traceback: {traceback.format_exc()}")
+        try:
+            await message.answer(f"❌ Произошла ошибка: {str(e)}")
+        except:
+            pass
 
 
 @router.message(Command("remove_premium"))
