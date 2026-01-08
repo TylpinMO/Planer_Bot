@@ -293,18 +293,11 @@ async def toggle_task_status(callback: CallbackQuery, session: AsyncSession, use
 Активных задач: {len(tasks)}
 Выполнено: {completed_count}{notification_info}
 
-{'<i>Все задачи выполнены! 🎉</i>' if not tasks else '<b>Активные задачи:</b>'}
+{'<i>Все задачи выполнены! 🎉</i>' if not tasks else '<b>Нажмите на задачу, чтобы отметить её выполненной:</b>'}
 """
     
-    if tasks:
-        for i, t in enumerate(tasks[:10], 1):
-            priority_emoji = {0: "", 1: "🔸", 2: "🔴"}
-            text += f"\n{i}. {priority_emoji.get(t.priority, '')} {t.text[:50]}"
-            if len(t.text) > 50:
-                text += "..."
-    
     try:
-        if len(tasks) <= 5 and tasks:
+        if tasks:
             await callback.message.edit_text(
                 text=text,
                 reply_markup=tasks_list_keyboard(tasks, list_id)

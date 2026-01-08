@@ -177,19 +177,12 @@ async def show_list_details(callback: CallbackQuery, session: AsyncSession, user
 Активных задач: {len(tasks)}
 Выполнено: {completed_count}{notification_info}
 
-{'<i>Список пуст. Добавьте первую задачу!</i>' if not tasks else '<b>Активные задачи:</b>'}
+{'<i>Список пуст. Добавьте первую задачу!</i>' if not tasks else '<b>Нажмите на задачу, чтобы отметить её выполненной:</b>'}
 """
     
-    if tasks:
-        for i, task in enumerate(tasks[:10], 1):
-            priority_emoji = {0: "", 1: "🔸", 2: "🔴"}
-            text += f"\n{i}. {priority_emoji.get(task.priority, '')} {task.text[:50]}"
-            if len(task.text) > 50:
-                text += "..."
-    
-    # Показываем кнопки задач если их мало, иначе кнопку "Все задачи"
+    # Показываем кнопки для всех задач (используем клавиатуру)
     try:
-        if len(tasks) <= 5 and tasks:
+        if tasks:
             await callback.message.edit_text(
                 text=text,
                 reply_markup=tasks_list_keyboard(tasks, list_id, task_list.notification_time is not None)
@@ -389,20 +382,19 @@ async def cancel_delete(callback: CallbackQuery, session: AsyncSession, user: Us
 Активных задач: {len(tasks)}
 Выполнено: {completed_count}{notification_info}
 
-{'<i>Список пуст. Добавьте первую задачу!</i>' if not tasks else '<b>Активные задачи:</b>'}
+{'<i>Список пуст. Добавьте первую задачу!</i>' if not tasks else '<b>Нажмите на задачу, чтобы отметить её выполненной:</b>'}
 """
             
             if tasks:
-                for i, task in enumerate(tasks[:10], 1):
-                    priority_emoji = {0: "", 1: "🔸", 2: "🔴"}
-                    text += f"\n{i}. {priority_emoji.get(task.priority, '')} {task.text[:50]}"
-                    if len(task.text) > 50:
-                        text += "..."
-            
-            await callback.message.edit_text(
-                text=text,
-                reply_markup=list_details_keyboard(list_id, task_list.notification_time is not None)
-            )
+                await callback.message.edit_text(
+                    text=text,
+                    reply_markup=tasks_list_keyboard(tasks, list_id, task_list.notification_time is not None)
+                )
+            else:
+                await callback.message.edit_text(
+                    text=text,
+                    reply_markup=list_details_keyboard(list_id, task_list.notification_time is not None)
+                )
     elif item_type == "task":
         # Для задачи возвращаемся к её просмотру (если потребуется)
         pass
