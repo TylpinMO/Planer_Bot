@@ -6,7 +6,7 @@ from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import User
-from bot.utils.datetime_helpers import utc_now
+from bot.utils.datetime_helpers import utc_now_naive
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class PremiumCheckMiddleware(BaseMiddleware):
         if user and session:
             # Проверяем, истёк ли премиум
             if user.is_premium and user.premium_until:
-                current_time = utc_now()
+                current_time = utc_now_naive()
                 
                 if user.premium_until <= current_time:
                     # Премиум истёк - отключаем

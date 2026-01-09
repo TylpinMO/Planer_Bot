@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import User
 from bot.keyboards.inline import main_menu_keyboard, back_to_menu_keyboard, timezone_keyboard, profile_keyboard
-from bot.utils.datetime_helpers import utc_now
+from bot.utils.datetime_helpers import utc_now, utc_now_naive
 from config import config
 
 router = Router()
@@ -20,8 +20,7 @@ async def cmd_start(message: Message, user: User):
     premium_status = '🆓 Бесплатный'
     if user.is_premium:
         if user.premium_until:
-            from datetime import datetime
-            days_left = (user.premium_until - datetime.utcnow()).days
+            days_left = (user.premium_until - utc_now_naive()).days
             premium_status = f'👑 Премиум до {user.premium_until.strftime("%d.%m.%Y")} ({days_left} дн.)'
         else:
             premium_status = '👑 Премиум ♮️'
@@ -71,8 +70,7 @@ async def show_main_menu(callback: CallbackQuery, user: User):
     premium_status = '🆓 Бесплатный'
     if user.is_premium:
         if user.premium_until:
-            from datetime import datetime
-            days_left = (user.premium_until - datetime.utcnow()).days
+            days_left = (user.premium_until - utc_now_naive()).days
             premium_status = f'👑 Премиум до {user.premium_until.strftime("%d.%m.%Y")} ({days_left} дн.)'
         else:
             premium_status = '👑 Премиум ♮️'

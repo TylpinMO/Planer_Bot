@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from database.models import User, TaskList, Task, Subscription, Payment
-from bot.utils.datetime_helpers import utc_now
+from bot.utils.datetime_helpers import utc_now, utc_now_naive
 
 
 class UserCRUD:
@@ -50,12 +50,15 @@ class UserCRUD:
         
         user.is_premium = True
         
+        # Используем naive datetime (без timezone) для совместимости с БД
+        now_naive = utc_now_naive()
+        
         # Если у пользователя уже есть активный премиум, добавляем дни к текущей дате окончания
-        if user.premium_until and user.premium_until > utc_now():
+        if user.premium_until and user.premium_until > now_naive:
             user.premium_until = user.premium_until + timedelta(days=days)
         else:
             # Если премиума нет или он истёк, устанавливаем новую дату
-            user.premium_until = utc_now() + timedelta(days=days)
+            user.premium_until = now_naive + timedelta(days=days)
         
         # Сбрасываем флаги уведомлений при продлении
         user.premium_notified_3days = False

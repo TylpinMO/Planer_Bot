@@ -10,6 +10,14 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def utc_now_naive() -> datetime:
+    """
+    Получить текущее время UTC без timezone (naive datetime).
+    Используется для совместимости с БД, где даты хранятся без timezone.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 def get_user_local_time_str(tz_offset: int) -> str:
     """
     Вычислить текущее локальное время пользователя в формате HH:MM
