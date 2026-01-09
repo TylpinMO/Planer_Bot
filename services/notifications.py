@@ -21,6 +21,11 @@ def utc_now():
     return datetime.now(timezone.utc)
 
 
+def utc_now_naive():
+    """Получить текущее время UTC без timezone (для сравнения с БД)"""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class NotificationService:
     """Сервис для отправки уведомлений"""
     
@@ -302,7 +307,7 @@ class NotificationService:
     
     async def _check_premium_expiration(self, session):
         """Проверка истечения премиума и отправка уведомлений"""
-        now = utc_now()
+        now = utc_now_naive()  # Используем naive datetime для сравнения с БД
         
         # Обрабатываем истёкший премиум
         await self._handle_expired_premium(session, now)

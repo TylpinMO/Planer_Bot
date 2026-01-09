@@ -1,11 +1,16 @@
 """Модели базы данных"""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy import BigInteger, String, Boolean, DateTime, ForeignKey, Integer, Text
 from sqlalchemy.ext.asyncio import AsyncAttrs, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from config import config
+
+
+def utcnow_naive():
+    """Получить текущее время UTC без timezone для использования в моделях БД"""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Base(AsyncAttrs, DeclarativeBase):
@@ -28,7 +33,7 @@ class User(Base):
     premium_notified_1day: Mapped[bool] = mapped_column(Boolean, default=False)   # Уведомление за 1 день
     timezone_offset: Mapped[int] = mapped_column(Integer, default=3)  # Смещение в часах от UTC (по умолчанию +3 МСК)
     daily_summary_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)  # Время ежедневной сводки для премиум (HH:MM)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
     
     # Связи
     task_lists: Mapped[list["TaskList"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -48,7 +53,7 @@ class TaskList(Base):
     name: Mapped[str] = mapped_column(String(255))
     notification_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)  # Формат "HH:MM"
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
     
     # Связи
     user: Mapped["User"] = relationship(back_populates="task_lists")
@@ -69,7 +74,7 @@ class Task(Base):
     deadline: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     notification_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)  # Только для премиум
     priority: Mapped[int] = mapped_column(Integer, default=0)  # 0-низкий, 1-средний, 2-высокий
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     
     # Связи
@@ -85,7 +90,7 @@ class Subscription(Base):
     
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
     expires_at: Mapped[datetime] = mapped_column(DateTime)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     payment_id: Mapped[Optional[int]] = mapped_column(ForeignKey("payments.id"), nullable=True)
@@ -106,7 +111,7 @@ class Payment(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     telegram_payment_charge_id: Mapped[str] = mapped_column(String(255), unique=True)
     amount_stars: Mapped[int] = mapped_column(Integer)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
     status: Mapped[str] = mapped_column(String(50), default="completed")  # pending, completed, refunded
     
     # Связи
