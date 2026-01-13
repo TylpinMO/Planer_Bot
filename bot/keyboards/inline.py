@@ -146,6 +146,9 @@ def tasks_list_keyboard(tasks: list, list_id: int, has_notification: bool = Fals
         InlineKeyboardButton(text="➕ Добавить задачу", callback_data=f"add_task_{list_id}")
     )
     builder.row(
+        InlineKeyboardButton(text="📜 История выполненных", callback_data=f"completed_tasks_{list_id}")
+    )
+    builder.row(
         InlineKeyboardButton(
             text=f"🔔 {'Изменить' if has_notification else 'Настроить'} уведомление",
             callback_data=f"set_notification_{list_id}"
