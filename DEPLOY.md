@@ -27,8 +27,8 @@ sudo su - planerbot
 
 ```bash
 cd ~
-git clone https://github.com/YOUR_USERNAME/PlanerBot.git
-cd PlanerBot
+git clone https://github.com/TylpinMO/Planer_Bot.git
+cd Planer_Bot
 ```
 
 ### 3. Настройка окружения

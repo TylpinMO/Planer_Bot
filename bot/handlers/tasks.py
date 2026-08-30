@@ -19,6 +19,17 @@ from bot.keyboards.inline import (
 router = Router()
 
 
+async def get_owned_task(session: AsyncSession, task_id: int, user: User):
+    """Не доверяем ID из callback или сохранённого состояния диалога."""
+    task = await TaskCRUD.get_by_id(session, task_id)
+    if task is None:
+        return None
+    task_list = await TaskListCRUD.get_by_id(session, task.list_id)
+    if not task_list or task_list.user_id != user.id or not task_list.is_active:
+        return None
+    return task
+
+
 class CreateTaskStates(StatesGroup):
     """Состояния для создания задачи"""
     waiting_for_text = State()
@@ -37,7 +48,7 @@ async def add_task_start(callback: CallbackQuery, session: AsyncSession, user: U
     
     task_list = await TaskListCRUD.get_by_id(session, list_id)
     
-    if not task_list or task_list.user_id != user.id:
+    if not task_list or task_list.user_id != user.id or not task_list.is_active:
         await callback.answer("❌ Список не найден", show_alert=True)
         return
     
@@ -61,7 +72,7 @@ async def add_task_start(callback: CallbackQuery, session: AsyncSession, user: U
 @router.message(CreateTaskStates.waiting_for_text)
 async def add_task_finish(message: Message, session: AsyncSession, state: FSMContext, user: User):
     """Завершить добавление задачи"""
-    task_text = message.text.strip()
+    task_text = (message.text or "").strip()
     
     if len(task_text) < 1:
         await message.answer("❌ Текст задачи не может быть пустым.")
@@ -75,6 +86,12 @@ async def add_task_finish(message: Message, session: AsyncSession, state: FSMCon
     data = await state.get_data()
     list_id = data.get("list_id")
     
+    task_list = await TaskListCRUD.get_by_id(session, list_id)
+    if not task_list or task_list.user_id != user.id or not task_list.is_active:
+        await message.answer("❌ Список не найден")
+        await state.clear()
+        return
+
     # Создаем задачу
     task = await TaskCRUD.create(session, list_id, task_text)
     
@@ -119,9 +136,9 @@ async def add_task_finish(message: Message, session: AsyncSession, state: FSMCon
 
 
 @router.message(CreateTaskStates.waiting_for_notification)
-async def set_new_task_notification(message: Message, session: AsyncSession, state: FSMContext):
+async def set_new_task_notification(message: Message, session: AsyncSession, state: FSMContext, user: User):
     """Установить уведомление для новой задачи"""
-    time_text = message.text.strip()
+    time_text = (message.text or "").strip()
     
     # Валидация формата времени
     try:
@@ -142,6 +159,13 @@ async def set_new_task_notification(message: Message, session: AsyncSession, sta
     task_id = data.get("task_id")
     list_id = data.get("list_id")
     
+    task = await get_owned_task(session, task_id, user)
+    if not task or not user.is_premium:
+        await message.answer("❌ Задача недоступна для настройки уведомления")
+        await state.clear()
+        return
+    list_id = task.list_id
+
     # Обновляем время уведомления
     await TaskCRUD.update_notification(session, task_id, time_formatted)
     
@@ -194,7 +218,7 @@ async def show_task_details(callback: CallbackQuery, session: AsyncSession, user
     
     task_list = await TaskListCRUD.get_by_id(session, task.list_id)
     
-    if task_list.user_id != user.id:
+    if not task_list or task_list.user_id != user.id or not task_list.is_active:
         await callback.answer("❌ Доступ запрещён", show_alert=True)
         return
     
@@ -231,7 +255,7 @@ async def show_task_details(callback: CallbackQuery, session: AsyncSession, user
 
 
 @router.callback_query(F.data.startswith("task_notify_"))
-async def set_task_notification_start(callback: CallbackQuery, user: User, state: FSMContext):
+async def set_task_notification_start(callback: CallbackQuery, user: User, state: FSMContext, session: AsyncSession):
     """Начать настройку уведомления для задачи (только премиум)"""
     if not user.is_premium:
         await callback.answer("⭐ Эта функция доступна только для премиум пользователей", show_alert=True)
@@ -239,6 +263,10 @@ async def set_task_notification_start(callback: CallbackQuery, user: User, state
     
     task_id = int(callback.data.split("_")[2])
     
+    if not await get_owned_task(session, task_id, user):
+        await callback.answer("❌ Задача не найдена", show_alert=True)
+        return
+
     text = """
 🔔 <b>Настройка уведомления для задачи</b>
 
@@ -270,6 +298,10 @@ async def toggle_task_status(callback: CallbackQuery, session: AsyncSession, use
     """Переключить статус выполнения задачи"""
     task_id = int(callback.data.split("_")[2])
     
+    if not await get_owned_task(session, task_id, user):
+        await callback.answer("❌ Задача не найдена", show_alert=True)
+        return
+
     task = await TaskCRUD.toggle_complete(session, task_id)
     
     status_text = "✅ Задача отмечена как выполненная!" if task.is_completed else "⬜ Задача снова активна!"
@@ -324,7 +356,7 @@ async def delete_task(callback: CallbackQuery, session: AsyncSession, user: User
     
     task_list = await TaskListCRUD.get_by_id(session, task.list_id)
     
-    if task_list.user_id != user.id:
+    if not task_list or task_list.user_id != user.id or not task_list.is_active:
         await callback.answer("❌ Доступ запрещён", show_alert=True)
         return
     
@@ -345,9 +377,9 @@ async def delete_task(callback: CallbackQuery, session: AsyncSession, user: User
 
 
 @router.message(SetTaskNotificationStates.waiting_for_time)
-async def set_task_notification_finish(message: Message, session: AsyncSession, state: FSMContext):
+async def set_task_notification_finish(message: Message, session: AsyncSession, state: FSMContext, user: User):
     """Завершить настройку уведомления для задачи"""
-    time_text = message.text.strip()
+    time_text = (message.text or "").strip()
     
     # Валидация формата времени
     try:
@@ -367,6 +399,11 @@ async def set_task_notification_finish(message: Message, session: AsyncSession, 
     data = await state.get_data()
     task_id = data.get("task_id")
     
+    if not user.is_premium or not await get_owned_task(session, task_id, user):
+        await message.answer("❌ Задача недоступна для настройки уведомления")
+        await state.clear()
+        return
+
     # Обновляем время уведомления
     task = await TaskCRUD.update_notification(session, task_id, time_formatted)
     

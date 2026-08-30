@@ -65,10 +65,9 @@ async def main():
     await init_db()
     
     # Инициализация бота и диспетчера
-    from aiogram.client.default import DefaultBotProperties
     bot = Bot(
         token=config.BOT_TOKEN,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+        parse_mode=ParseMode.HTML
     )
     dp = Dispatcher()
     

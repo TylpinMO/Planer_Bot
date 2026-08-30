@@ -4,8 +4,8 @@
 
 ```bash
 # 1. Клонируйте репозиторий
-git clone https://github.com/YOUR_USERNAME/PlanerBot.git
-cd PlanerBot
+git clone https://github.com/TylpinMO/Planer_Bot.git
+cd Planer_Bot
 
 # 2. Создайте venv и установите зависимости
 python3 -m venv venv

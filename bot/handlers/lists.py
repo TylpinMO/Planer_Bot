@@ -403,10 +403,15 @@ async def cancel_delete(callback: CallbackQuery, session: AsyncSession, user: Us
 
 
 @router.callback_query(F.data.startswith("set_notification_"))
-async def set_notification_start(callback: CallbackQuery, user: User, state: FSMContext):
+async def set_notification_start(callback: CallbackQuery, user: User, state: FSMContext, session: AsyncSession):
     """Начать настройку уведомления"""
     list_id = int(callback.data.split("_")[2])
     
+    task_list = await TaskListCRUD.get_by_id(session, list_id)
+    if not task_list or task_list.user_id != user.id or not task_list.is_active:
+        await callback.answer("❌ Список не найден", show_alert=True)
+        return
+
     text = f"""
 🔔 <b>Настройка уведомления</b>
 
@@ -427,9 +432,9 @@ async def set_notification_start(callback: CallbackQuery, user: User, state: FSM
 
 
 @router.message(SetNotificationStates.waiting_for_time)
-async def set_notification_finish(message: Message, session: AsyncSession, state: FSMContext):
+async def set_notification_finish(message: Message, session: AsyncSession, state: FSMContext, user: User):
     """Завершить настройку уведомления"""
-    time_text = message.text.strip()
+    time_text = (message.text or "").strip()
     
     # Валидация формата времени
     try:
@@ -449,6 +454,12 @@ async def set_notification_finish(message: Message, session: AsyncSession, state
     data = await state.get_data()
     list_id = data.get("list_id")
     
+    task_list = await TaskListCRUD.get_by_id(session, list_id)
+    if not task_list or task_list.user_id != user.id or not task_list.is_active:
+        await message.answer("❌ Список не найден")
+        await state.clear()
+        return
+
     # Обновляем время уведомления
     task_list = await TaskListCRUD.update_notification_time(session, list_id, time_formatted)
     
